@@ -39,16 +39,26 @@ TDengine sink when writing rows back to TDengine.
 | sub_tables   | list   | no       | -             |
 | lower_bound  | string | yes      | -             |
 | upper_bound  | string | yes      | -             |
+| where        | string | no       | -             |
 | read_columns | list   | no       | -             |
 
 ### url [string]
 
-The TDengine REST JDBC URL.
+The TDengine JDBC URL. Port is usually `6041` (taosAdapter).
+
+**The JDBC driver major version must match the TDengine server**: use the connector
+fat jar that embeds `taos-jdbcdriver` 2.0.38 for TDengine 2.x, and 3.5.3 for
+TDengine 3.x. Do not place multiple `connector-tdengine*.jar` files in the same
+`connectors/` directory.
+
+- TDengine 2.x: `jdbc:TAOS://` and `jdbc:TAOS-RS://` (WebSocket is not supported).
+- TDengine 3.x: REST (`TAOS-RS`) and WebSocket (`TAOS-WS`); WebSocket is recommended.
 
 e.g.
 
 ```
 jdbc:TAOS-RS://localhost:6041/
+jdbc:TAOS-WS://localhost:6041/
 ```
 
 ### username [string]
@@ -85,6 +95,14 @@ The exclusive upper bound of the query time range. The connector adds
 `timestamp_column < upper_bound` to each sub table query. Use a
 TDengine-compatible timestamp string, for example `2018-10-03 14:38:16.801`.
 
+### where [string]
+
+An optional TDengine predicate without the `WHERE` keyword. It can reference ordinary columns
+and TAGS defined by the configured super table, for example
+`location = 'beijing' and voltage > 220`. The connector queries the super table for each split
+and adds `tbname = '<sub_table>'`, wraps this condition in parentheses, then appends the required
+time range. Do not include `WHERE`, `FROM`, or a trailing semicolon.
+
 ### read_columns [list]
 
 A list of column names to read. If it is not configured, all columns are read.
@@ -116,6 +134,7 @@ source {
     stable = "meters"
     lower_bound = "2018-10-03 14:38:05.000"
     upper_bound = "2018-10-03 14:38:16.801"
+    where = "location = 'beijing' and voltage > 220"
     plugin_output = "tdengine_result"
   }
 }

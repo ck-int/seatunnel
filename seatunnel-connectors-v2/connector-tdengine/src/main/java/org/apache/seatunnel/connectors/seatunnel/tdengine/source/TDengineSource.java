@@ -32,7 +32,10 @@ import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
 import org.apache.seatunnel.connectors.seatunnel.tdengine.config.TDengineSourceConfig;
+import org.apache.seatunnel.connectors.seatunnel.tdengine.constant.TDengineMetaQueryConstant;
 import org.apache.seatunnel.connectors.seatunnel.tdengine.state.TDengineSourceState;
+import org.apache.seatunnel.connectors.seatunnel.tdengine.support.TDengineServerMajorVersion;
+import org.apache.seatunnel.connectors.seatunnel.tdengine.support.TDengineServerVersionDetector;
 import org.apache.seatunnel.connectors.seatunnel.tdengine.typemapper.TDengineTypeMapper;
 
 import com.taosdata.jdbc.TSDBDriver;
@@ -122,32 +125,30 @@ public class TDengineSource
         Properties properties = new Properties();
         properties.put(TSDBDriver.PROPERTY_KEY_USER, config.getUsername());
         properties.put(TSDBDriver.PROPERTY_KEY_PASSWORD, config.getPassword());
-        String metaSQL =
-                String.format(
-                        "select table_name from information_schema.ins_tables where db_name = '%s' and stable_name='%s'",
-                        config.getDatabase(), config.getStable());
         try (Connection conn = DriverManager.getConnection(jdbcUrl, properties);
-                Statement statement = conn.createStatement();
-                ResultSet metaResultSet =
-                        statement.executeQuery(
-                                String.format(
-                                        "desc %s.%s", config.getDatabase(), config.getStable()));
-                ResultSet subTableNameResultSet = statement.executeQuery(metaSQL)) {
-            while (metaResultSet.next()) {
-                if (timestampFieldName == null) {
-                    timestampFieldName = metaResultSet.getString(1);
+                Statement statement = conn.createStatement()) {
+            // 先探测服务端主版本，再读表结构；驱动不匹配时至少能打出版本日志
+            TDengineServerMajorVersion majorVersion =
+                    TDengineServerVersionDetector.detect(
+                            statement, config.getUrl(), config.getUsername(), config.getPassword());
+            try (ResultSet metaResultSet =
+                    statement.executeQuery(
+                            String.format(
+                                    "desc %s.%s", config.getDatabase(), config.getStable()))) {
+                while (metaResultSet.next()) {
+                    if (timestampFieldName == null) {
+                        timestampFieldName = metaResultSet.getString(1);
+                    }
+                    if (config.getReadColumns() != null
+                            && !config.getReadColumns().isEmpty()
+                            && !config.getReadColumns().contains(metaResultSet.getString(1))) {
+                        continue;
+                    }
+                    fieldNames.add(metaResultSet.getString(1));
+                    fieldTypes.add(TDengineTypeMapper.mapping(metaResultSet.getString(2)));
                 }
-                if (config.getReadColumns() != null
-                        && !config.getReadColumns().isEmpty()
-                        && !config.getReadColumns().contains(metaResultSet.getString(1))) {
-                    continue;
-                }
-                fieldNames.add(metaResultSet.getString(1));
-                fieldTypes.add(TDengineTypeMapper.mapping(metaResultSet.getString(2)));
             }
-
-            while (subTableNameResultSet.next()) {
-                String subTableName = subTableNameResultSet.getString(1);
+            for (String subTableName : listSubTableNames(statement, config, majorVersion)) {
                 if (config.getSubTables() != null
                         && !config.getSubTables().isEmpty()
                         && !config.getSubTables().contains(subTableName)) {
@@ -172,5 +173,45 @@ public class TDengineSource
                 ArrayUtils.add(
                         fieldTypes.toArray(new SeaTunnelDataType[0]), 0, BasicType.STRING_TYPE);
         return new SeaTunnelRowType(newFieldNames, newFieldTypes);
+    }
+
+    /**
+     * 按探测到的服务端主版本列出超级表下的子表。
+     *
+     * <p>3.x 使用 information_schema.ins_tables；2.x 使用 {@code SELECT TBNAME FROM db.stable}。
+     */
+    private List<String> listSubTableNames(
+            Statement statement,
+            TDengineSourceConfig config,
+            TDengineServerMajorVersion majorVersion)
+            throws SQLException {
+        String metaSQL;
+        if (majorVersion == TDengineServerMajorVersion.V2) {
+            metaSQL =
+                    String.format(
+                            TDengineMetaQueryConstant.SUB_TABLE_SQL_V2,
+                            config.getDatabase(),
+                            config.getStable());
+        } else {
+            metaSQL =
+                    String.format(
+                            TDengineMetaQueryConstant.SUB_TABLE_SQL_V3,
+                            config.getDatabase(),
+                            config.getStable());
+        }
+        try (ResultSet subTableNameResultSet = statement.executeQuery(metaSQL)) {
+            return readFirstColumn(subTableNameResultSet);
+        }
+    }
+
+    private List<String> readFirstColumn(ResultSet resultSet) throws SQLException {
+        List<String> values = new ArrayList<>();
+        while (resultSet.next()) {
+            String value = resultSet.getString(1);
+            if (value != null && !values.contains(value)) {
+                values.add(value);
+            }
+        }
+        return values;
     }
 }

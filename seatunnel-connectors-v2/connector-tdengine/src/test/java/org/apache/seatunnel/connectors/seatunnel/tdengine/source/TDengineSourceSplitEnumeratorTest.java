@@ -21,6 +21,10 @@ import org.apache.seatunnel.api.common.metrics.MetricsContext;
 import org.apache.seatunnel.api.event.EventListener;
 import org.apache.seatunnel.api.source.SourceEvent;
 import org.apache.seatunnel.api.source.SourceSplitEnumerator;
+import org.apache.seatunnel.api.table.type.BasicType;
+import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
+import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
+import org.apache.seatunnel.connectors.seatunnel.tdengine.config.TDengineSourceConfig;
 import org.apache.seatunnel.connectors.seatunnel.tdengine.state.TDengineSourceState;
 
 import org.junit.jupiter.api.Assertions;
@@ -85,6 +89,62 @@ public class TDengineSourceSplitEnumeratorTest {
         Assertions.assertTrue(state.getPendingSplits().isEmpty());
     }
 
+    @Test
+    public void shouldAddRequiredTimeRangeToSubTableQuery() throws Exception {
+        TDengineSourceSplitEnumerator enumerator =
+                new TDengineSourceSplitEnumerator(
+                        new StableMetadata(
+                                new SeaTunnelRowType(
+                                        new String[] {"ts", "voltage"},
+                                        new SeaTunnelDataType<?>[] {
+                                            BasicType.STRING_TYPE, BasicType.STRING_TYPE
+                                        }),
+                                "ts",
+                                Collections.singletonList("d1001")),
+                        buildSourceConfig(),
+                        new TestingContext(1));
+        Method createSplitBySubTable =
+                TDengineSourceSplitEnumerator.class.getDeclaredMethod(
+                        "createSplitBySubTable", String.class, String.class);
+        createSplitBySubTable.setAccessible(true);
+
+        TDengineSourceSplit split =
+                (TDengineSourceSplit) createSplitBySubTable.invoke(enumerator, "d1001", "ts");
+
+        Assertions.assertEquals(
+                "select `voltage` from power.`meters` where tbname = 'd1001' and `ts` >= '2024-01-01 00:00:00.000' and `ts` < '2024-01-02 00:00:00.000'",
+                split.getQuery());
+    }
+
+    @Test
+    public void shouldAddCustomWhereConditionToSuperTableQuery() throws Exception {
+        TDengineSourceConfig sourceConfig = buildSourceConfig();
+        sourceConfig.setWhereCondition("location = 'beijing' and voltage > 220");
+        TDengineSourceSplitEnumerator enumerator =
+                new TDengineSourceSplitEnumerator(
+                        new StableMetadata(
+                                new SeaTunnelRowType(
+                                        new String[] {"ts", "voltage"},
+                                        new SeaTunnelDataType<?>[] {
+                                            BasicType.STRING_TYPE, BasicType.STRING_TYPE
+                                        }),
+                                "ts",
+                                Collections.singletonList("d1001")),
+                        sourceConfig,
+                        new TestingContext(1));
+        Method createSplitBySubTable =
+                TDengineSourceSplitEnumerator.class.getDeclaredMethod(
+                        "createSplitBySubTable", String.class, String.class);
+        createSplitBySubTable.setAccessible(true);
+
+        TDengineSourceSplit split =
+                (TDengineSourceSplit) createSplitBySubTable.invoke(enumerator, "d1001", "ts");
+
+        Assertions.assertEquals(
+                "select `voltage` from power.`meters` where tbname = 'd1001' and (location = 'beijing' and voltage > 220) and `ts` >= '2024-01-01 00:00:00.000' and `ts` < '2024-01-02 00:00:00.000'",
+                split.getQuery());
+    }
+
     private TDengineSourceSplitEnumerator newEnumerator(
             TestingContext context, TDengineSourceState sourceState) {
         return new TDengineSourceSplitEnumerator(
@@ -110,6 +170,15 @@ public class TDengineSourceSplitEnumeratorTest {
             splits.add(new TDengineSourceSplit(String.valueOf(i), "query-" + i));
         }
         return splits;
+    }
+
+    private TDengineSourceConfig buildSourceConfig() {
+        TDengineSourceConfig sourceConfig = new TDengineSourceConfig();
+        sourceConfig.setDatabase("power");
+        sourceConfig.setStable("meters");
+        sourceConfig.setLowerBound("2024-01-01 00:00:00.000");
+        sourceConfig.setUpperBound("2024-01-02 00:00:00.000");
+        return sourceConfig;
     }
 
     private static class TestingContext

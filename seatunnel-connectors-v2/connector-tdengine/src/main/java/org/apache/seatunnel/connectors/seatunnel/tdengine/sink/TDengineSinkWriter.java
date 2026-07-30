@@ -79,7 +79,9 @@ public class TDengineSinkWriter extends AbstractSinkWriter<SeaTunnelRow, Void>
                                 "desc " + config.getDatabase() + "." + config.getStable())) {
 
             while (metaResultSet.next()) {
-                if (StringUtils.equals("TAG", metaResultSet.getString("note"))) {
+                // TDengine 2.x REST JDBC returns column label "Note"; 3.x may return "note".
+                String note = metaResultSet.getString(4);
+                if (StringUtils.equalsIgnoreCase("TAG", note)) {
                     tagsNum++;
                 }
             }

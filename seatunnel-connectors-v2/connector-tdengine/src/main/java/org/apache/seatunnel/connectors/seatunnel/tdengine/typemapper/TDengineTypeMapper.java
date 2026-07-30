@@ -83,6 +83,11 @@ public class TDengineTypeMapper {
     private static final String TDENGINE_GEOMETRY = "GEOMETRY";
 
     public static SeaTunnelDataType<?> mapping(String tdengineType) {
+        if (tdengineType == null) {
+            throw new TDengineConnectorException(
+                    CommonErrorCodeDeprecated.UNSUPPORTED_DATA_TYPE,
+                    "TDengine column type is null. Usually the JDBC driver version does not match the TDengine server (use 2.x driver for 2.x server, 3.x driver for 3.x server).");
+        }
         switch (tdengineType) {
             case TDENGINE_BOOL:
             case TDENGINE_BIT:
@@ -126,6 +131,9 @@ public class TDengineTypeMapper {
             case TDENGINE_VARCHAR:
             case TDENGINE_JSON:
             case TDENGINE_LONGTEXT:
+            case TDENGINE_BINARY:
+            case TDENGINE_VARBINARY:
+                // REST/WebSocket JDBC often returns textual values for BINARY/VARBINARY.
                 return BasicType.STRING_TYPE;
             case TDENGINE_DATE:
                 return LocalTimeType.LOCAL_DATE_TYPE;
@@ -139,8 +147,6 @@ public class TDengineTypeMapper {
             case TDENGINE_MEDIUMBLOB:
             case TDENGINE_BLOB:
             case TDENGINE_LONGBLOB:
-            case TDENGINE_VARBINARY:
-            case TDENGINE_BINARY:
                 return PrimitiveByteArrayType.INSTANCE;
 
                 // Doesn't support yet

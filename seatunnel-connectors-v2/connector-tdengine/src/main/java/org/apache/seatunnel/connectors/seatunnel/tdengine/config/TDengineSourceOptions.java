@@ -36,6 +36,14 @@ public class TDengineSourceOptions extends TDengineCommonOptions {
                     .noDefaultValue()
                     .withDescription("The upper bound for data query range");
 
+    public static final Option<String> WHERE =
+            Options.key("where")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "The optional TDengine predicate without the WHERE keyword. "
+                                    + "It can reference columns and tags of the configured super table.");
+
     public static final Option<List<String>> SUB_TABLES =
             Options.key("sub_tables")
                     .listType()

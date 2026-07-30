@@ -29,7 +29,8 @@ public abstract class TDengineCommonOptions {
             Options.key("url")
                     .stringType()
                     .noDefaultValue()
-                    .withDescription("The TDengine server URL, format: jdbc:TAOS-RS://host:port");
+                    .withDescription(
+                            "The TDengine server URL, format: jdbc:TAOS-RS://host:port or jdbc:TAOS-WS://host:port");
 
     public static final Option<String> USERNAME =
             Options.key("username")

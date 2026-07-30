@@ -36,12 +36,18 @@ import ChangeLog from '../changelog/connector-tdengine.md';
 
 ### url [string]
 
-TDengine REST JDBC 连接地址。
+TDengine JDBC 连接地址。端口一般为 `6041`（taosAdapter）。
+
+**驱动与服务端主版本必须一致**：TDengine 2.x 请使用内嵌 `taos-jdbcdriver` 2.0.38 的连接器包；TDengine 3.x 请使用内嵌 3.5.3 的连接器包。同一 `connectors/` 目录下不要同时放置多个 `connector-tdengine*.jar`。
+
+- TDengine 2.x：支持 `jdbc:TAOS://`、`jdbc:TAOS-RS://`（不支持 WebSocket）。
+- TDengine 3.x：支持 REST（`TAOS-RS`）与 WebSocket（`TAOS-WS`），推荐 WebSocket。
 
 例如
 
 ```
 jdbc:TAOS-RS://localhost:6041/
+jdbc:TAOS-WS://localhost:6041/
 ```
 
 ### username [string]

@@ -17,6 +17,7 @@
 
 package org.apache.seatunnel.connectors.seatunnel.tdengine.utils;
 
+import org.apache.seatunnel.connectors.seatunnel.tdengine.constant.TDengineMetaQueryConstant;
 import org.apache.seatunnel.connectors.seatunnel.tdengine.exception.TDengineConnectorErrorCode;
 import org.apache.seatunnel.connectors.seatunnel.tdengine.exception.TDengineConnectorException;
 
@@ -29,6 +30,11 @@ import java.sql.SQLException;
 @Slf4j
 public class TDengineUtil {
 
+    /**
+     * 按 JDBC URL 协议加载并注册对应驱动（REST / WebSocket / Native）。
+     *
+     * @param jdbcUrl TDengine JDBC URL
+     */
     public static synchronized void checkDriverExist(String jdbcUrl) {
         try {
             DriverManager.getDriver(jdbcUrl);
@@ -36,12 +42,7 @@ public class TDengineUtil {
             log.warn("no available driver found for this {}, waiting for it to load", jdbcUrl);
         }
 
-        String driverName;
-        if (jdbcUrl.startsWith("jdbc:TAOS-RS://")) {
-            driverName = "com.taosdata.jdbc.rs.RestfulDriver";
-        } else {
-            driverName = "com.taosdata.jdbc.TSDBDriver";
-        }
+        String driverName = resolveDriverClassName(jdbcUrl);
 
         try {
             Class<?> clazz =
@@ -54,5 +55,21 @@ public class TDengineUtil {
                     "Fail to create driver of class " + driverName,
                     ex);
         }
+    }
+
+    /**
+     * 根据 JDBC URL 前缀解析驱动类名。
+     *
+     * @param jdbcUrl TDengine JDBC URL
+     * @return 驱动类名
+     */
+    static String resolveDriverClassName(String jdbcUrl) {
+        if (jdbcUrl != null && jdbcUrl.startsWith(TDengineMetaQueryConstant.JDBC_TAOS_RS_PREFIX)) {
+            return TDengineMetaQueryConstant.DRIVER_CLASS_RESTFUL;
+        }
+        if (jdbcUrl != null && jdbcUrl.startsWith(TDengineMetaQueryConstant.JDBC_TAOS_WS_PREFIX)) {
+            return TDengineMetaQueryConstant.DRIVER_CLASS_WEBSOCKET;
+        }
+        return TDengineMetaQueryConstant.DRIVER_CLASS_NATIVE;
     }
 }

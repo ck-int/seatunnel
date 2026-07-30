@@ -131,23 +131,28 @@ public class TDengineSourceSplitEnumerator
                         .collect(Collectors.joining(","));
         String subTableSQL =
                 String.format(
-                        "select %s from %s.`%s`", selectFields, config.getDatabase(), subTableName);
-        String start = config.getLowerBound();
-        String end = config.getUpperBound();
-        if (start != null || end != null) {
-            String startCondition = null;
-            String endCondition = null;
-            // Left closed right away
-            if (start != null) {
-                startCondition = timestampFieldName + " >= '" + start + "'";
-            }
-            if (end != null) {
-                endCondition = timestampFieldName + " < '" + end + "'";
-            }
-            String query = String.join(" and ", startCondition, endCondition);
-            subTableSQL = subTableSQL + " where " + query;
+                        "select %s from %s.`%s`",
+                        selectFields, config.getDatabase(), config.getStable());
+        String whereCondition =
+                String.format(
+                        "tbname = '%s' and `%s` >= '%s' and `%s` < '%s'",
+                        subTableName,
+                        timestampFieldName,
+                        config.getLowerBound(),
+                        timestampFieldName,
+                        config.getUpperBound());
+        if (config.getWhereCondition() != null && !config.getWhereCondition().trim().isEmpty()) {
+            whereCondition =
+                    String.format(
+                            "tbname = '%s' and (%s) and `%s` >= '%s' and `%s` < '%s'",
+                            subTableName,
+                            config.getWhereCondition(),
+                            timestampFieldName,
+                            config.getLowerBound(),
+                            timestampFieldName,
+                            config.getUpperBound());
         }
-
+        subTableSQL = subTableSQL + " where " + whereCondition;
         return new TDengineSourceSplit(subTableName, subTableSQL);
     }
 

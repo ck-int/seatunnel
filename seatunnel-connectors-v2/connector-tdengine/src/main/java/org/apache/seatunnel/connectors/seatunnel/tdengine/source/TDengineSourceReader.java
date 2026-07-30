@@ -22,6 +22,7 @@ import org.apache.seatunnel.api.source.SourceReader;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.common.exception.CommonErrorCodeDeprecated;
 import org.apache.seatunnel.connectors.seatunnel.tdengine.config.TDengineSourceConfig;
+import org.apache.seatunnel.connectors.seatunnel.tdengine.constant.TDengineMetaQueryConstant;
 import org.apache.seatunnel.connectors.seatunnel.tdengine.exception.TDengineConnectorException;
 
 import com.taosdata.jdbc.TSDBDriver;
@@ -139,14 +140,42 @@ public class TDengineSourceReader implements SourceReader<SeaTunnelRow, TDengine
     }
 
     private Object convertDataType(Object object) {
-        if (Objects.isNull(object)) return null;
+        if (Objects.isNull(object)) {
+            return null;
+        }
 
         if (Timestamp.class.equals(object.getClass())) {
             return ((Timestamp) object).toLocalDateTime();
-        } else if (byte[].class.equals(object.getClass())) {
+        }
+        if (byte[].class.equals(object.getClass())) {
             return new String((byte[]) object);
         }
+        // REST JDBC may wrap string-like columns as Jackson TextNode
+        if (isJacksonJsonNode(object)) {
+            return convertJsonNodeToText(object);
+        }
         return object;
+    }
+
+    private static boolean isJacksonJsonNode(Object object) {
+        Class<?> clazz = object.getClass();
+        while (clazz != null) {
+            if (TDengineMetaQueryConstant.JACKSON_JSON_NODE_CLASS.equals(clazz.getName())) {
+                return true;
+            }
+            clazz = clazz.getSuperclass();
+        }
+        return false;
+    }
+
+    private static Object convertJsonNodeToText(Object object) {
+        try {
+            return object.getClass()
+                    .getMethod(TDengineMetaQueryConstant.JACKSON_AS_TEXT_METHOD)
+                    .invoke(object);
+        } catch (ReflectiveOperationException e) {
+            return String.valueOf(object);
+        }
     }
 
     @Override

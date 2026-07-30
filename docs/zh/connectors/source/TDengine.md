@@ -34,16 +34,23 @@ import ChangeLog from '../changelog/connector-tdengine.md';
 | sub_tables     | list   | 否   | -              |
 | lower_bound    | string | 是   | -              |
 | upper_bound    | string | 是   | -              |
+| where          | string | 否   | -              |
 | read_columns   | list   | 否   | -              |
 
 ### url [string]
 
-TDengine REST JDBC 连接地址。
+TDengine JDBC 连接地址。端口一般为 `6041`（taosAdapter）。
+
+**驱动与服务端主版本必须一致**：TDengine 2.x 请使用内嵌 `taos-jdbcdriver` 2.0.38 的连接器包；TDengine 3.x 请使用内嵌 3.5.3 的连接器包。同一 `connectors/` 目录下不要同时放置多个 `connector-tdengine*.jar`。
+
+- TDengine 2.x：支持 `jdbc:TAOS://`、`jdbc:TAOS-RS://`（不支持 WebSocket）。
+- TDengine 3.x：支持 REST（`TAOS-RS`）与 WebSocket（`TAOS-WS`），推荐 WebSocket。
 
 例如：
 
 ```
 jdbc:TAOS-RS://localhost:6041/
+jdbc:TAOS-WS://localhost:6041/
 ```
 
 ### username [string]
@@ -74,6 +81,12 @@ TDengine 子表名称列表。不配置时读取该超级表下的所有子表�
 
 查询时间范围的上界，不包含该时间点。连接器会为每个子表查询加上 `timestamp_column < upper_bound` 条件。请使用 TDengine 可识别的时间字符串，例如 `2018-10-03 14:38:16.801`。
 
+### where [string]
+
+可选的 TDengine 过滤表达式，不要包含 `WHERE` 关键字。表达式可以引用配置的超级表中的普通列和 TAGS，例如
+`location = 'beijing' and voltage > 220`。连接器会按分片查询超级表，并自动拼接
+`tbname = '<子表名>'`，再用括号包裹该条件并追加必填时间范围。请不要传入 `WHERE`、`FROM` 或结尾分号。
+
 ### read_columns [list]
 
 要读取的列名列表。不配置时读取所有列。读取超级表时，请将 TAGS 字段放在列表末尾。不要在这里配置 `subtable_name`，连接器会自动把它作为第一列输出。
@@ -99,6 +112,7 @@ source {
     stable = "meters"
     lower_bound = "2018-10-03 14:38:05.000"
     upper_bound = "2018-10-03 14:38:16.801"
+    where = "location = 'beijing' and voltage > 220"
     plugin_output = "tdengine_result"
   }
 }

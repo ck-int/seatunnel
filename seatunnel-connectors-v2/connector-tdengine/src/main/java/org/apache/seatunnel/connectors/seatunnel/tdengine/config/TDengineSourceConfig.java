@@ -29,7 +29,7 @@ import java.util.stream.Collectors;
 @Data
 public class TDengineSourceConfig implements Serializable {
 
-    /** jdbc:TAOS-RS://localhost:6041/ */
+    /** jdbc:TAOS-RS://localhost:6041/ or jdbc:TAOS-WS://localhost:6041/ */
     private String url;
 
     private String username;
@@ -38,6 +38,10 @@ public class TDengineSourceConfig implements Serializable {
     private String stable;
     private String lowerBound;
     private String upperBound;
+
+    /** 配置在超级表查询中的附加过滤条件，不包含 WHERE 关键字。 */
+    private String whereCondition;
+
     private List<String> tags;
     private Set<String> subTables;
     private Set<String> readColumns;
@@ -51,6 +55,9 @@ public class TDengineSourceConfig implements Serializable {
         tdengineSourceConfig.setPassword(pluginConfig.get(TDengineSourceOptions.PASSWORD));
         tdengineSourceConfig.setUpperBound(pluginConfig.get(TDengineSourceOptions.UPPER_BOUND));
         tdengineSourceConfig.setLowerBound(pluginConfig.get(TDengineSourceOptions.LOWER_BOUND));
+        pluginConfig
+                .getOptional(TDengineSourceOptions.WHERE)
+                .ifPresent(tdengineSourceConfig::setWhereCondition);
         if (pluginConfig.getOptional(TDengineSourceOptions.SUB_TABLES).isPresent()) {
             tdengineSourceConfig.setSubTables(
                     pluginConfig.get(TDengineSourceOptions.SUB_TABLES).stream()

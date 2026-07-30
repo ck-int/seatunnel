@@ -43,12 +43,21 @@ sub table name.
 
 ### url [string]
 
-The TDengine REST JDBC URL.
+The TDengine JDBC URL. Port is usually `6041` (taosAdapter).
+
+**The JDBC driver major version must match the TDengine server**: use the connector
+fat jar that embeds `taos-jdbcdriver` 2.0.38 for TDengine 2.x, and 3.5.3 for
+TDengine 3.x. Do not place multiple `connector-tdengine*.jar` files in the same
+`connectors/` directory.
+
+- TDengine 2.x: `jdbc:TAOS://` and `jdbc:TAOS-RS://` (WebSocket is not supported).
+- TDengine 3.x: REST (`TAOS-RS`) and WebSocket (`TAOS-WS`); WebSocket is recommended.
 
 e.g.
 
 ```
 jdbc:TAOS-RS://localhost:6041/
+jdbc:TAOS-WS://localhost:6041/
 ```
 
 ### username [string]

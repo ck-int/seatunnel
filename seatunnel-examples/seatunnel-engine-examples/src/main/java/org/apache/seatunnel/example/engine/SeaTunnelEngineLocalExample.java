@@ -22,6 +22,7 @@ import org.apache.seatunnel.core.starter.enums.MasterType;
 import org.apache.seatunnel.core.starter.exception.CommandException;
 import org.apache.seatunnel.core.starter.seatunnel.args.ClientCommandArgs;
 
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -37,7 +38,7 @@ public class SeaTunnelEngineLocalExample {
     public static void main(String[] args)
             throws FileNotFoundException, URISyntaxException, CommandException {
         String configurePath = args.length > 0 ? args[0] : "/examples/fake_to_console.conf";
-        String configFile = getTestConfigFile(configurePath);
+        String configFile = resolveConfigFile(configurePath);
         ClientCommandArgs clientCommandArgs = new ClientCommandArgs();
         clientCommandArgs.setConfigFile(configFile);
         clientCommandArgs.setCheckConfig(false);
@@ -46,6 +47,15 @@ public class SeaTunnelEngineLocalExample {
         // SeaTunnelEngineClusterServerExample
         clientCommandArgs.setMasterType(MasterType.LOCAL);
         SeaTunnel.run(clientCommandArgs.buildCommand());
+    }
+
+    public static String resolveConfigFile(String configFile)
+            throws FileNotFoundException, URISyntaxException {
+        File file = new File(configFile);
+        if (file.isFile()) {
+            return file.getAbsolutePath();
+        }
+        return getTestConfigFile(configFile);
     }
 
     public static String getTestConfigFile(String configFile)

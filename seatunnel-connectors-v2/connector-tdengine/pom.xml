@@ -29,6 +29,11 @@
     <artifactId>connector-tdengine</artifactId>
     <name>SeaTunnel : Connectors V2 : TDengine</name>
 
+    <properties>
+        <!-- Override with -Dtaos.jdbc.version=2.0.38 for TDengine 2.x fat jar -->
+        <taos.jdbc.version>3.5.3</taos.jdbc.version>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>org.apache.seatunnel</groupId>
@@ -38,7 +43,8 @@
         <dependency>
             <groupId>com.taosdata.jdbc</groupId>
             <artifactId>taos-jdbcdriver</artifactId>
-            <version>3.0.3</version>
+            <!-- Driver major version must match TDengine server (2.x vs 3.x). -->
+            <version>${taos.jdbc.version}</version>
         </dependency>
     </dependencies>
 
