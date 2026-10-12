@@ -21,7 +21,7 @@
         <version>2.3.13</version>
     </parent>
 
-    <artifactId>seatunnel-jetty9-9.4.56</artifactId>
+    <artifactId>seatunnel-jetty9-9.4.57</artifactId>
 
     <name>SeaTunnel : Shade : Jetty</name>
 
@@ -50,7 +50,7 @@
                         </goals>
                         <phase>package</phase>
                         <configuration>
-                            <finalName>seatunnel-jetty9-9.4.56</finalName>
+                            <finalName>seatunnel-jetty9-9.4.57</finalName>
                             <createSourcesJar>true</createSourcesJar>
                             <shadeSourcesContent>true</shadeSourcesContent>
                             <shadedArtifactAttached>false</shadedArtifactAttached>
@@ -88,7 +88,7 @@
                         <configuration>
                             <artifacts>
                                 <artifact>
-                                    <file>${basedir}/target/seatunnel-jetty9-9.4.56.jar</file>
+                                    <file>${basedir}/target/seatunnel-jetty9-9.4.57.jar</file>
                                     <type>jar</type>
                                     <classifier>optional</classifier>
                                 </artifact>
