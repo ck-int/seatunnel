@@ -8,7 +8,7 @@ import ChangeLog from '../changelog/connector-tdengine.md';
 
 从 TDengine 超级表读取数据。
 
-该 Source 以批处理方式按时间范围读取一个超级表的数据。可以读取该超级表下的所有子表，也可以只读取指定子表；同时支持只读取部分列。
+该 Source 以批处理方式读取一个超级表的数据。配置时间边界时按边界读取；未配置时不自动追加时间边界，可在过滤条件中自行指定时间范围。可以读取该超级表下的所有子表，也可以只读取指定子表；同时支持只读取部分列。
 
 每个 source 分片会读取一个 TDengine 子表。输出字段会自动把 `subtable_name` 放在第一列，用来保留原始子表名；如果下游继续写入 TDengine，TDengine sink 也会使用这一列作为目标子表名。
 
@@ -32,8 +32,8 @@ import ChangeLog from '../changelog/connector-tdengine.md';
 | database       | string | 是   | -              |
 | stable         | string | 是   | -              |
 | sub_tables     | list   | 否   | -              |
-| lower_bound    | string | 是   | -              |
-| upper_bound    | string | 是   | -              |
+| lower_bound    | string | 条件必填 | -           |
+| upper_bound    | string | 条件必填 | -           |
 | where          | string | 否   | -              |
 | read_columns   | list   | 否   | -              |
 
@@ -75,17 +75,19 @@ TDengine 子表名称列表。不配置时读取该超级表下的所有子表�
 
 ### lower_bound [string]
 
-查询时间范围的下界，包含该时间点。连接器会为每个子表查询加上 `timestamp_column >= lower_bound` 条件。请使用 TDengine 可识别的时间字符串，例如 `2018-10-03 14:38:05.000`。
+可选的查询时间范围下界，包含该时间点。必须与 `upper_bound` 一起配置；配置后连接器会为每个子表查询追加 `timestamp_column >= lower_bound` 条件。未配置时不会自动追加时间边界，请使用 TDengine 可识别的时间字符串，例如 `2018-10-03 14:38:05.000`。
 
 ### upper_bound [string]
 
-查询时间范围的上界，不包含该时间点。连接器会为每个子表查询加上 `timestamp_column < upper_bound` 条件。请使用 TDengine 可识别的时间字符串，例如 `2018-10-03 14:38:16.801`。
+可选的查询时间范围上界，不包含该时间点。必须与 `lower_bound` 一起配置；配置后连接器会为每个子表查询追加 `timestamp_column < upper_bound` 条件。未配置时不会自动追加时间边界，请使用 TDengine 可识别的时间字符串，例如 `2018-10-03 14:38:16.801`。
 
 ### where [string]
 
-可选的 TDengine 过滤表达式，不要包含 `WHERE` 关键字。表达式可以引用配置的超级表中的普通列和 TAGS，例如
-`location = 'beijing' and voltage > 220`。连接器会按分片查询超级表，并自动拼接
-`tbname = '<子表名>'`，再用括号包裹该条件并追加必填时间范围。请不要传入 `WHERE`、`FROM` 或结尾分号。
+可选的 TDengine 完整过滤表达式，不要包含 `WHERE` 关键字。表达式可以引用配置的超级表中的普通列和 TAGS，例如
+`location = 'beijing' and voltage > 220`。连接器会自动拼接
+`tbname = '<子表名>'`；如果同时配置了 `lower_bound` 和 `upper_bound`，还会将两者与该表达式用 `AND` 连接。未配置时间边界时，时间过滤可以直接写在此表达式中。请不要传入 `WHERE`、`FROM` 或结尾分号。
+
+如果既未配置时间边界，也未在 `where` 中提供时间条件，连接器会读取匹配子表的全部历史数据，请谨慎使用。
 
 ### read_columns [list]
 
@@ -95,7 +97,7 @@ TDengine 子表名称列表。不配置时读取该超级表下的所有子表�
 
 ## 示例
 
-### 按时间范围读取所有子表
+### 按自定义条件读取所有子表
 
 ```hocon
 env {
@@ -110,8 +112,6 @@ source {
     password = "taosdata"
     database = "power"
     stable = "meters"
-    lower_bound = "2018-10-03 14:38:05.000"
-    upper_bound = "2018-10-03 14:38:16.801"
     where = "location = 'beijing' and voltage > 220"
     plugin_output = "tdengine_result"
   }

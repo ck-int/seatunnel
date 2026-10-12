@@ -28,21 +28,26 @@ public class TDengineSourceOptions extends TDengineCommonOptions {
             Options.key("lower_bound")
                     .stringType()
                     .noDefaultValue()
-                    .withDescription("The lower bound for data query range");
+                    .withDescription(
+                            "Optional inclusive lower bound for data query range. "
+                                    + "Configure it together with upper_bound.");
 
     public static final Option<String> UPPER_BOUND =
             Options.key("upper_bound")
                     .stringType()
                     .noDefaultValue()
-                    .withDescription("The upper bound for data query range");
+                    .withDescription(
+                            "Optional exclusive upper bound for data query range. "
+                                    + "Configure it together with lower_bound.");
 
     public static final Option<String> WHERE =
             Options.key("where")
                     .stringType()
                     .noDefaultValue()
                     .withDescription(
-                            "The optional TDengine predicate without the WHERE keyword. "
-                                    + "It can reference columns and tags of the configured super table.");
+                            "The optional complete TDengine predicate without the WHERE keyword. "
+                                    + "It is combined with the configured time bounds and can reference "
+                                    + "columns and tags of the configured super table.");
 
     public static final Option<List<String>> SUB_TABLES =
             Options.key("sub_tables")

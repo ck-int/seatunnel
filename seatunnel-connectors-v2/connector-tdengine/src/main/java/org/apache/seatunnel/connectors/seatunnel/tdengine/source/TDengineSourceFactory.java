@@ -46,9 +46,13 @@ public class TDengineSourceFactory implements TableSourceFactory {
                         TDengineSourceOptions.USERNAME,
                         TDengineSourceOptions.PASSWORD,
                         TDengineSourceOptions.DATABASE,
-                        TDengineSourceOptions.STABLE,
+                        TDengineSourceOptions.STABLE)
+                .optional(
                         TDengineSourceOptions.LOWER_BOUND,
-                        TDengineSourceOptions.UPPER_BOUND)
+                        TDengineSourceOptions.UPPER_BOUND,
+                        TDengineSourceOptions.WHERE,
+                        TDengineSourceOptions.SUB_TABLES,
+                        TDengineSourceOptions.READ_COLUMNS)
                 .build();
     }
 

@@ -18,6 +18,7 @@
 package org.apache.seatunnel.connectors.seatunnel.tdengine.source;
 
 import org.apache.seatunnel.api.common.metrics.MetricsContext;
+import org.apache.seatunnel.api.configuration.ReadonlyConfig;
 import org.apache.seatunnel.api.event.EventListener;
 import org.apache.seatunnel.api.source.SourceEvent;
 import org.apache.seatunnel.api.source.SourceSplitEnumerator;
@@ -25,6 +26,7 @@ import org.apache.seatunnel.api.table.type.BasicType;
 import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
 import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
 import org.apache.seatunnel.connectors.seatunnel.tdengine.config.TDengineSourceConfig;
+import org.apache.seatunnel.connectors.seatunnel.tdengine.config.TDengineSourceOptions;
 import org.apache.seatunnel.connectors.seatunnel.tdengine.state.TDengineSourceState;
 
 import org.junit.jupiter.api.Assertions;
@@ -117,9 +119,11 @@ public class TDengineSourceSplitEnumeratorTest {
     }
 
     @Test
-    public void shouldAddCustomWhereConditionToSuperTableQuery() throws Exception {
+    public void shouldUseCustomWhereConditionWithoutBoundsWhenBoundsAbsent() throws Exception {
         TDengineSourceConfig sourceConfig = buildSourceConfig();
         sourceConfig.setWhereCondition("location = 'beijing' and voltage > 220");
+        sourceConfig.setLowerBound(null);
+        sourceConfig.setUpperBound(null);
         TDengineSourceSplitEnumerator enumerator =
                 new TDengineSourceSplitEnumerator(
                         new StableMetadata(
@@ -141,8 +145,97 @@ public class TDengineSourceSplitEnumeratorTest {
                 (TDengineSourceSplit) createSplitBySubTable.invoke(enumerator, "d1001", "ts");
 
         Assertions.assertEquals(
-                "select `voltage` from power.`meters` where tbname = 'd1001' and (location = 'beijing' and voltage > 220) and `ts` >= '2024-01-01 00:00:00.000' and `ts` < '2024-01-02 00:00:00.000'",
+                "select `voltage` from power.`meters` where tbname = 'd1001' and (location = 'beijing' and voltage > 220)",
                 split.getQuery());
+    }
+
+    @Test
+    public void shouldAllowSourceConfigWithoutTimeBounds() {
+        Map<String, Object> config = new HashMap<>();
+        config.put(TDengineSourceOptions.URL.key(), "jdbc:TAOS-WS://localhost:6041/");
+        config.put(TDengineSourceOptions.USERNAME.key(), "root");
+        config.put(TDengineSourceOptions.PASSWORD.key(), "password");
+        config.put(TDengineSourceOptions.DATABASE.key(), "power");
+        config.put(TDengineSourceOptions.STABLE.key(), "meters");
+        config.put(TDengineSourceOptions.WHERE.key(), "device_id = 'd1001'");
+
+        TDengineSourceConfig sourceConfig =
+                TDengineSourceConfig.buildSourceConfig(ReadonlyConfig.fromMap(config));
+
+        Assertions.assertNull(sourceConfig.getLowerBound());
+        Assertions.assertNull(sourceConfig.getUpperBound());
+    }
+
+    @Test
+    public void shouldAppendTimeRangeWhenCustomWhereIsConfigured() throws Exception {
+        TDengineSourceConfig sourceConfig = buildSourceConfig();
+        sourceConfig.setWhereCondition("device_id = 'd1001'");
+        TDengineSourceSplitEnumerator enumerator =
+                new TDengineSourceSplitEnumerator(
+                        new StableMetadata(
+                                new SeaTunnelRowType(
+                                        new String[] {"ts", "voltage"},
+                                        new SeaTunnelDataType<?>[] {
+                                            BasicType.STRING_TYPE, BasicType.STRING_TYPE
+                                        }),
+                                "ts",
+                                Collections.singletonList("d1001")),
+                        sourceConfig,
+                        new TestingContext(1));
+        Method createSplitBySubTable =
+                TDengineSourceSplitEnumerator.class.getDeclaredMethod(
+                        "createSplitBySubTable", String.class, String.class);
+        createSplitBySubTable.setAccessible(true);
+
+        TDengineSourceSplit split =
+                (TDengineSourceSplit) createSplitBySubTable.invoke(enumerator, "d1001", "ts");
+
+        Assertions.assertTrue(split.getQuery().contains("device_id = 'd1001'"));
+        Assertions.assertTrue(split.getQuery().contains("2024-01-01 00:00:00.000"));
+        Assertions.assertTrue(split.getQuery().contains("2024-01-02 00:00:00.000"));
+    }
+
+    @Test
+    public void shouldBuildSubTableQueryWithoutTimeRangeWhenBoundsAreAbsent() throws Exception {
+        TDengineSourceConfig sourceConfig = new TDengineSourceConfig();
+        sourceConfig.setDatabase("power");
+        sourceConfig.setStable("meters");
+        TDengineSourceSplitEnumerator enumerator =
+                new TDengineSourceSplitEnumerator(
+                        new StableMetadata(
+                                new SeaTunnelRowType(
+                                        new String[] {"ts", "voltage"},
+                                        new SeaTunnelDataType<?>[] {
+                                            BasicType.STRING_TYPE, BasicType.STRING_TYPE
+                                        }),
+                                "ts",
+                                Collections.singletonList("d1001")),
+                        sourceConfig,
+                        new TestingContext(1));
+        Method createSplitBySubTable =
+                TDengineSourceSplitEnumerator.class.getDeclaredMethod(
+                        "createSplitBySubTable", String.class, String.class);
+        createSplitBySubTable.setAccessible(true);
+
+        TDengineSourceSplit split =
+                (TDengineSourceSplit) createSplitBySubTable.invoke(enumerator, "d1001", "ts");
+
+        Assertions.assertTrue(split.getQuery().endsWith("where tbname = 'd1001'"));
+    }
+
+    @Test
+    public void shouldRejectIncompleteTimeRangeConfiguration() {
+        Map<String, Object> config = new HashMap<>();
+        config.put(TDengineSourceOptions.URL.key(), "jdbc:TAOS-WS://localhost:6041/");
+        config.put(TDengineSourceOptions.USERNAME.key(), "root");
+        config.put(TDengineSourceOptions.PASSWORD.key(), "password");
+        config.put(TDengineSourceOptions.DATABASE.key(), "power");
+        config.put(TDengineSourceOptions.STABLE.key(), "meters");
+        config.put(TDengineSourceOptions.LOWER_BOUND.key(), "2024-01-01 00:00:00.000");
+
+        Assertions.assertThrows(
+                IllegalArgumentException.class,
+                () -> TDengineSourceConfig.buildSourceConfig(ReadonlyConfig.fromMap(config)));
     }
 
     private TDengineSourceSplitEnumerator newEnumerator(

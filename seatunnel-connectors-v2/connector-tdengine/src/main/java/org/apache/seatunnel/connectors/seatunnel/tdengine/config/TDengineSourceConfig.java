@@ -17,6 +17,8 @@
 
 package org.apache.seatunnel.connectors.seatunnel.tdengine.config;
 
+import org.apache.commons.lang3.StringUtils;
+
 import org.apache.seatunnel.api.configuration.ReadonlyConfig;
 
 import lombok.Data;
@@ -39,7 +41,7 @@ public class TDengineSourceConfig implements Serializable {
     private String lowerBound;
     private String upperBound;
 
-    /** 配置在超级表查询中的附加过滤条件，不包含 WHERE 关键字。 */
+    /** 配置在超级表查询中的附加过滤条件，不包含 WHERE 关键字；与时间边界共同生效。 */
     private String whereCondition;
 
     private List<String> tags;
@@ -53,11 +55,21 @@ public class TDengineSourceConfig implements Serializable {
         tdengineSourceConfig.setStable(pluginConfig.get(TDengineSourceOptions.STABLE));
         tdengineSourceConfig.setUsername(pluginConfig.get(TDengineSourceOptions.USERNAME));
         tdengineSourceConfig.setPassword(pluginConfig.get(TDengineSourceOptions.PASSWORD));
-        tdengineSourceConfig.setUpperBound(pluginConfig.get(TDengineSourceOptions.UPPER_BOUND));
-        tdengineSourceConfig.setLowerBound(pluginConfig.get(TDengineSourceOptions.LOWER_BOUND));
-        pluginConfig
-                .getOptional(TDengineSourceOptions.WHERE)
-                .ifPresent(tdengineSourceConfig::setWhereCondition);
+        String lowerBound =
+                pluginConfig.getOptional(TDengineSourceOptions.LOWER_BOUND).orElse(null);
+        String upperBound =
+                pluginConfig.getOptional(TDengineSourceOptions.UPPER_BOUND).orElse(null);
+        String whereCondition =
+                pluginConfig.getOptional(TDengineSourceOptions.WHERE).orElse(null);
+        boolean hasLowerBound = StringUtils.isNotBlank(lowerBound);
+        boolean hasUpperBound = StringUtils.isNotBlank(upperBound);
+        if (hasLowerBound != hasUpperBound) {
+            throw new IllegalArgumentException(
+                    "TDengine source requires lower_bound and upper_bound together");
+        }
+        tdengineSourceConfig.setLowerBound(lowerBound);
+        tdengineSourceConfig.setUpperBound(upperBound);
+        tdengineSourceConfig.setWhereCondition(whereCondition);
         if (pluginConfig.getOptional(TDengineSourceOptions.SUB_TABLES).isPresent()) {
             tdengineSourceConfig.setSubTables(
                     pluginConfig.get(TDengineSourceOptions.SUB_TABLES).stream()

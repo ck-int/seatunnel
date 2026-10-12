@@ -8,9 +8,11 @@ import ChangeLog from '../changelog/connector-tdengine.md';
 
 Read data from TDengine super tables.
 
-The source reads data in batch mode by querying a time range from one super
-table. You can read all sub tables under the super table, limit the read to
-specific sub tables, and select only part of the columns.
+The source reads data in batch mode from one super table. When both time bounds
+are configured, they limit the query range; otherwise no automatic time boundary
+is added and the time predicate can be supplied in `where`. You can read all sub
+tables under the super table, limit the read to specific sub tables, and select
+only part of the columns.
 
 Each source split reads one TDengine sub table. The output schema always adds
 `subtable_name` as the first field so that downstream sinks can keep the
@@ -37,8 +39,8 @@ TDengine sink when writing rows back to TDengine.
 | database     | string | yes      | -             |
 | stable       | string | yes      | -             |
 | sub_tables   | list   | no       | -             |
-| lower_bound  | string | yes      | -             |
-| upper_bound  | string | yes      | -             |
+| lower_bound  | string | conditional | -          |
+| upper_bound  | string | conditional | -          |
 | where        | string | no       | -             |
 | read_columns | list   | no       | -             |
 
@@ -85,23 +87,32 @@ are read.
 
 ### lower_bound [string]
 
-The inclusive lower bound of the query time range. The connector adds
-`timestamp_column >= lower_bound` to each sub table query. Use a
-TDengine-compatible timestamp string, for example `2018-10-03 14:38:05.000`.
+An optional inclusive lower bound of the query time range. Configure it together
+with `upper_bound`. When both bounds are configured, the connector adds
+`timestamp_column >= lower_bound` to each sub table query. If the bounds are not
+configured, no automatic time boundary is added. Use a TDengine-compatible timestamp string, for example
+`2018-10-03 14:38:05.000`.
 
 ### upper_bound [string]
 
-The exclusive upper bound of the query time range. The connector adds
-`timestamp_column < upper_bound` to each sub table query. Use a
-TDengine-compatible timestamp string, for example `2018-10-03 14:38:16.801`.
+An optional exclusive upper bound of the query time range. Configure it together
+with `lower_bound`. When both bounds are configured, the connector adds
+`timestamp_column < upper_bound` to each sub table query. If the bounds are not
+configured, no automatic time boundary is added. Use a TDengine-compatible timestamp string, for example
+`2018-10-03 14:38:16.801`.
 
 ### where [string]
 
-An optional TDengine predicate without the `WHERE` keyword. It can reference ordinary columns
-and TAGS defined by the configured super table, for example
-`location = 'beijing' and voltage > 220`. The connector queries the super table for each split
-and adds `tbname = '<sub_table>'`, wraps this condition in parentheses, then appends the required
-time range. Do not include `WHERE`, `FROM`, or a trailing semicolon.
+An optional complete TDengine predicate without the `WHERE` keyword. It can reference ordinary
+columns and TAGS defined by the configured super table, for example
+`location = 'beijing' and voltage > 220`. The connector queries the super table for each split and
+adds `tbname = '<sub_table>'`. When both `lower_bound` and `upper_bound` are configured, they are
+also combined with this predicate using `AND`; when the bounds are absent, add any required time
+predicate here. Do not include `WHERE`,
+`FROM`, or a trailing semicolon.
+
+If neither time bounds nor a time predicate in `where` is configured, all historical
+data from the matching sub tables may be read; use this mode with care.
 
 ### read_columns [list]
 
@@ -117,7 +128,7 @@ correctly.
 
 ## Examples
 
-### Read all sub tables in a time range
+### Read all sub tables with a custom predicate
 
 ```hocon
 env {
@@ -132,8 +143,6 @@ source {
     password = "taosdata"
     database = "power"
     stable = "meters"
-    lower_bound = "2018-10-03 14:38:05.000"
-    upper_bound = "2018-10-03 14:38:16.801"
     where = "location = 'beijing' and voltage > 220"
     plugin_output = "tdengine_result"
   }

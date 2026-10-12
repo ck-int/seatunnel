@@ -17,6 +17,8 @@
 
 package org.apache.seatunnel.connectors.seatunnel.tdengine.source;
 
+import org.apache.commons.lang3.StringUtils;
+
 import org.apache.seatunnel.api.source.SourceSplitEnumerator;
 import org.apache.seatunnel.common.exception.CommonErrorCodeDeprecated;
 import org.apache.seatunnel.connectors.seatunnel.tdengine.config.TDengineSourceConfig;
@@ -133,20 +135,16 @@ public class TDengineSourceSplitEnumerator
                 String.format(
                         "select %s from %s.`%s`",
                         selectFields, config.getDatabase(), config.getStable());
-        String whereCondition =
-                String.format(
-                        "tbname = '%s' and `%s` >= '%s' and `%s` < '%s'",
-                        subTableName,
-                        timestampFieldName,
-                        config.getLowerBound(),
-                        timestampFieldName,
-                        config.getUpperBound());
-        if (config.getWhereCondition() != null && !config.getWhereCondition().trim().isEmpty()) {
+        String whereCondition = String.format("tbname = '%s'", subTableName);
+        if (StringUtils.isNotBlank(config.getWhereCondition())) {
+            whereCondition =
+                    String.format("%s and (%s)", whereCondition, config.getWhereCondition());
+        }
+        if (hasTimeBounds()) {
             whereCondition =
                     String.format(
-                            "tbname = '%s' and (%s) and `%s` >= '%s' and `%s` < '%s'",
-                            subTableName,
-                            config.getWhereCondition(),
+                            "%s and `%s` >= '%s' and `%s` < '%s'",
+                            whereCondition,
                             timestampFieldName,
                             config.getLowerBound(),
                             timestampFieldName,
@@ -154,6 +152,11 @@ public class TDengineSourceSplitEnumerator
         }
         subTableSQL = subTableSQL + " where " + whereCondition;
         return new TDengineSourceSplit(subTableName, subTableSQL);
+    }
+
+    private boolean hasTimeBounds() {
+        return StringUtils.isNotBlank(config.getLowerBound())
+                && StringUtils.isNotBlank(config.getUpperBound());
     }
 
     @Override
